@@ -54,7 +54,7 @@ void INTyaw() {
   if (digitalRead(7) == HIGH) contadorYawInit = micros();
   if (digitalRead(7) == LOW) PulsoYaw = micros() - contadorYawInit;
 }
-
+void lectura_mandoRC() {
   // =============== From pulse to degrees equations
   wPitch =   ((wMinPitch - wMaxPitch) / (tMaxPitch - tMinPitch)) * ((PulsoPitch ) / 1000.00 - tMinPitch) + wMaxPitch;
   wRoll =   ((wMaxRoll - wMinRoll) / (tMaxRoll - tMinRoll)) * ((PulsoRoll) / 1000.00 - tMinRoll) + wMinRoll;
@@ -84,3 +84,4 @@ void INTyaw() {
     digitalWrite(11,HIGH);
   }
   pulsoPotenciaAnt = pulsoPotencia;
+  }
