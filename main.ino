@@ -1,5 +1,5 @@
-#define usCiclo 6000  // 
-// ==========================================
+#define EIDSP_QUANTIZE_FILTERBANK   0
+#define usCiclo 6000  
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
@@ -44,6 +44,21 @@ bool Enciendete = false;
 float hoverDistance = 40;
 bool hover = false;
 Despegado = false;
+#include <PDM.h>
+#include <tfg_arduino_drone_inference.h>
+typedef struct {
+	int16_t *buffer;
+	uint8_t buf_ready;
+	uint32_t buf_count;
+	uint32_t n_samples;
+} inference_t;
+bool Enciendete=false;
+static inference_t inference;
+static bool record_ready = false;
+static signed short sampleBuffer[2048];
+static bool debug_nn = false; // Set this to true to see e.g. features generated from the raw signal
+float lighton, lightoff, noise;
+
 //=============================================//////////////////// SETUP ////////////////////=============================================
 void setup() {
 	TWBR = 24;    //Set the I2C clock speed to 400kHz.
@@ -71,12 +86,40 @@ void setup() {
 	pinMode(6, OUTPUT);  //Motor 4
 	
 	}
-	
+	//Microphone
+	ei_printf("Inferencing settings:\n");
+	ei_printf("\tInterval: %.2f ms.\n", (float)EI_CLASSIFIER_INTERVAL_MS);
+	ei_printf("\tFrame size: %d\n", EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE);
+	ei_printf("\tSample length: %d ms.\n", EI_CLASSIFIER_RAW_SAMPLE_COUNT / 16);
+	ei_printf("\tNo. of classes: %d\n", sizeof(ei_classifier_inferencing_categories) / sizeof(ei_classifier_inferencing_categories[0]));
+	if (microphone_inference_start(EI_CLASSIFIER_RAW_SAMPLE_COUNT) == false) {
+		ei_printf("ERR: Failed to setup audio sampling\r\n");
+		return;
+	}
 	BatCheck();     // Read battery voltage
 	IMU_calibration();
 	Calib_Motores(); // Motor calibration
-	
 	loop_timer = micros();
+	while(despegado == false){ //If our drone has not taken-off yet, we either take-off by turning our stick throttle to maximum or say "Enciendete"
+		VoiceCommand();
+		if(Enciendete == true){ //In case our voice command orders the drone to take off, we will put max throttle
+		pulsoThrottle = 2000;
+		despegado=true;
+		}
+		else if (pulsoThrottle > 2100 || pulsoThrottle < 1850){ //In case our stick orders the drone to take off, we will enter in the main loop
+		despegado=true;	
+		Enciendete = false;
+		}
+	
+	}
+	while (despegado = true && Enciendete == true){ //If it is the case that our drone has taken-off with our voice, we will compute distance until hover is met.
+		computeDistance();
+		if (hover == true){ //When hover is met, we will leave this loop with 65% throttle @hover, entering the main loop with our drone already flying and waiting for inputs
+			Enciendete == false;
+			pulsoThrottle=2000*0.65
+		}
+	
+	}
 }
 
 // =============================================//////////////////// LOOP ////////////////////=============================================
